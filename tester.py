@@ -9,8 +9,6 @@ import threading
 import matplotlib.pyplot as plt
 import numpy as np
 import tkinter as tk
-# Initialize CustomTkinter theme
-from FaceDetectionModule import detect, eyesCascade, noseCascade, mouthCascade, faceCascade
 
 ctk.set_appearance_mode("Dark")  # System, Dark, or Light
 ctk.set_default_color_theme("dark-blue")  # Optional: can use other themes like 'green', 'dark-blue'
@@ -278,7 +276,7 @@ class AttendanceSystem:
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
                         cv2.rectangle(img, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
                         cv2.putText(img, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
-
+                        self.student_name_display.configure(text=name)
                 img = Image.fromarray(img)
                 imgtk = ImageTk.PhotoImage(image=img)
                 ctk_image = ctk.CTkImage(light_image=img, size=(640, 480))
