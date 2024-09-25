@@ -19,10 +19,14 @@ def draw_boundary(img, classifier, scaleFactor, minNeighbors, color, text):
 
 
 # Method to detect the features
-def detect(img, faceCascade, eyeCascade, noseCascade, mouthCascade):
-    isFace = False
+def detect(img, faceCascade, eyeCascade=None, noseCascade=None, mouthCascade=None):
     color = {"blue":(255,0,0), "red":(0,0,255), "green":(0,255,0), "white":(255,255,255)}
-    coords = draw_boundary(img, faceCascade, 1.1, 10, color['blue'], "Face")
+    coords = draw_boundary(img, faceCascade, 1.1, 10, color['green'], "Face Detected")
+    isFace = False
+    if coords:
+        isFace = True
+    else:
+        isFace = False
     votes = 0
     total_votes = 3
 
@@ -38,7 +42,7 @@ def detect(img, faceCascade, eyeCascade, noseCascade, mouthCascade):
           # One vote each for eyes, nose, and mouth
 
         # Detect eyes
-        eyes = eyeCascade.detectMultiScale(roi_img)
+        '''eyes = eyeCascade.detectMultiScale(roi_img)
         if len(eyes) >= 2:
             votes += 1
             print("Eyes Detected")
@@ -56,17 +60,17 @@ def detect(img, faceCascade, eyeCascade, noseCascade, mouthCascade):
             print("Mouth Detected")
         if votes == 3:
             print("Face Detected")
-
+'''
         # Calculate vote percentage
-        vote_percentage = votes / total_votes
-        draw_boundary(roi_img, eyeCascade, 1.1, 12, color['red'], 'Eyes{}'.format(vote_percentage))
-        draw_boundary(roi_img, noseCascade, 1.1, 4, color['green'], "Nose = {}".format(vote_percentage))
-        draw_boundary(roi_img, mouthCascade, 1.1, 4, color['white'], "Mouth  = {}".format(vote_percentage))
+        #vote_percentage = votes / total_votes
+        #draw_boundary(roi_img, eyeCascade, 1.1, 12, color['red'], 'Eyes{}'.format(vote_percentage))
+        #draw_boundary(roi_img, noseCascade, 1.1, 4, color['green'], "Nose = {}".format(vote_percentage))
+        #draw_boundary(roi_img, mouthCascade, 1.1, 4, color['white'], "Mouth  = {}".format(vote_percentage))
+        #draw_boundary(roi_img,faceCascade,1.1, 4, color['red'],"")
 
 
 
-
-    return img
+    return img,isFace
 
 
 
