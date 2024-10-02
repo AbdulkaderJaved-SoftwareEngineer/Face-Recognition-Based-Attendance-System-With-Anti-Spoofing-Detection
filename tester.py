@@ -9,6 +9,10 @@ import threading
 import matplotlib.pyplot as plt
 import numpy as np
 import tkinter as tk
+import pandas as pd
+import datetime
+
+from FaceDetectionModule import faceCascade, detect
 
 ctk.set_appearance_mode("Dark")  # System, Dark, or Light
 ctk.set_default_color_theme("dark-blue")  # Optional: can use other themes like 'green', 'dark-blue'
@@ -16,6 +20,10 @@ ctk.set_default_color_theme("dark-blue")  # Optional: can use other themes like 
 
 class StudentManagementApp:
     def __init__(self, root):
+
+        ctk.set_appearance_mode("Dark")  # System, Dark, or Light
+        ctk.set_default_color_theme("dark-blue")  # Optional: can use other themes like 'green', 'dark-blue'
+
         self.root = root
         self.root.geometry("800x600")
         self.root.title("Student Management")
@@ -23,6 +31,7 @@ class StudentManagementApp:
         # Global variables as instance variables
         self.cap = None
         self.roll_entry = None
+        self.faceShown = False
 
         # Ensure the directory for storing images exists
         if not os.path.exists("ImagesBasic"):
@@ -38,10 +47,15 @@ class StudentManagementApp:
         if not roll_no:
             messagebox.showerror("Error", "Roll number is required to save the image.")
             return
+        elif not self.faceShown:
+            messagebox.showerror("Face Not Detected", "Please make sure your face is properly and then try to capture the image ")
+            return
         if ret:
             img_name = f"ImagesBasic/{roll_no}.png"
             cv2.imwrite(img_name, frame)
             messagebox.showinfo("Success", f"Image saved as {img_name}")
+
+
             # Return to the main page
             self.show_main_page()
         else:
@@ -59,31 +73,41 @@ class StudentManagementApp:
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Create the form for student details
-        form_frame = ctk.CTkFrame(main_frame)
-        form_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        self.form_frame = ctk.CTkFrame(main_frame)
+        self.form_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
         # Input fields for student details
-        tk.Label(form_frame, text="Student Name:", bg="#2b2b2b", fg="white").grid(row=0, column=0, padx=10, pady=5,
+        ctk.CTkLabel(self.form_frame, text="Student Name:").grid(row=0, column=0, padx=10, pady=5,
                                                                                   sticky="w")
-        name_entry = ctk.CTkEntry(form_frame)
+        name_entry = ctk.CTkEntry(self.form_frame)
         name_entry.grid(row=0, column=1, padx=10, pady=5)
 
-        tk.Label(form_frame, text="Branch:", bg="#2b2b2b", fg="white").grid(row=1, column=0, padx=10, pady=5,
+        ctk.CTkLabel(self.form_frame, text="Branch:").grid(row=1, column=0, padx=10, pady=5,
                                                                             sticky="w")
-        branch_entry = ctk.CTkEntry(form_frame)
+        branch_entry = ctk.CTkEntry(self.form_frame)
         branch_entry.grid(row=1, column=1, padx=10, pady=5)
 
-        tk.Label(form_frame, text="Roll No:", bg="#2b2b2b", fg="white").grid(row=2, column=0, padx=10, pady=5,
+        ctk.CTkLabel(self.form_frame, text="Roll No:").grid(row=2, column=0, padx=10, pady=5,
                                                                              sticky="w")
-        self.roll_entry = ctk.CTkEntry(form_frame)
+        self.roll_entry = ctk.CTkEntry(self.form_frame)
         self.roll_entry.grid(row=2, column=1, padx=10, pady=5)
 
-        tk.Label(form_frame, text="Year:", bg="#2b2b2b", fg="white").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        year_entry = ctk.CTkEntry(form_frame)
+
+        ctk.CTkLabel(self.form_frame, text="Year:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        year_entry = ctk.CTkEntry(self.form_frame)
         year_entry.grid(row=3, column=1, padx=10, pady=5)
 
-        backBtn = ctk.CTkButton(form_frame, text="Back", command=self.show_main_page)
+        backBtn = ctk.CTkButton(self.form_frame, text="Back", command=self.go_to_back_page,width= 150,
+             height = 40)
         backBtn.grid(row=4, column=1)
+
+
+
+        year_entry = ctk.CTkEntry(self.form_frame)
+        year_entry.grid(row=3, column=1, padx=10, pady=5)
+
+
+
 
         # Create a frame for camera feed and capture button
         camera_frame = ctk.CTkFrame(main_frame)
@@ -108,6 +132,11 @@ class StudentManagementApp:
         ret, frame = self.cap.read()
         if ret:
             cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            myFrame, face = detect(cv2image, faceCascade)
+            if face:
+                self.faceShown = True
+            else:
+                self.faceShown = False
             img = Image.fromarray(cv2image)
             imgtk = ImageTk.PhotoImage(image=img)
             self.lmain.imgtk = imgtk
@@ -115,6 +144,15 @@ class StudentManagementApp:
             self.lmain.after(10, self.show_frame)
 
         # Function to show the main page with Add Student button
+    def go_to_back_page(self):
+        if self.cap is not None:
+            self.cap.release()
+            self.cap = None
+
+        self.show_main_page()
+
+
+
 
     def show_main_page(self):
         # Release the camera if it's open
@@ -126,8 +164,15 @@ class StudentManagementApp:
         for widget in self.root.winfo_children():
             widget.destroy()
 
+        backgrodundImage = Image.open('logo.png')
+        bgImage2 = ImageTk.PhotoImage(backgrodundImage,size=(20,20))
+        label = ctk.CTkLabel(self.root,image=bgImage2,text="")
+        label.pack()
+
+
         # Add Student button
-        add_student_button = ctk.CTkButton(self.root, text="Add Student", command=self.show_capture_page)
+        add_student_button = ctk.CTkButton(self.root, text="Add Student", command=self.show_capture_page,width= 150,
+             height = 40)
         add_student_button.pack(expand=True)
 
 
@@ -221,6 +266,8 @@ class AttendanceSystem:
 
         print(self.className)
 
+
+
         def findencodings(images):
             encodelist = []
             for img in images:
@@ -229,6 +276,9 @@ class AttendanceSystem:
                 encodelist.append(encode)
 
             return encodelist
+
+
+
 
         self.encodelistknown = findencodings(images)
 
@@ -276,7 +326,35 @@ class AttendanceSystem:
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
                         cv2.rectangle(img, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
                         cv2.putText(img, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
-                        self.student_name_display.configure(text=name)
+                        self.student_name_display.configure(text=f'Now Showing : {name}',font=('Arial', 25))
+
+                        with open('Attendance.csv', 'r+') as f:
+                            mydataList = f.readlines()  # Use readlines() instead of readline()
+                            namelist = []
+
+                            for line in mydataList:
+                                entry = line.split(',')
+                                namelist.append(entry[0])
+
+                            if name not in namelist:
+                                now1 = datetime.datetime.now()
+                                dateString = now1.strftime('%I:%M:%S')
+                                taarik = now1.strftime('%Y/%m/%d')
+                                f.writelines(f'\n{name},{dateString},Present,{taarik}')
+                                f.flush()  # Ensure the data is written before reading the file
+
+                                # Specify the engine explicitly
+                                  # Use 'openpyxl' for .xlsx files
+
+
+                    else:
+                        name = "UNKNOWN"
+                        y1, x2, y2, x1 = faceloc
+                        y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
+                        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv2.rectangle(img, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
+                        cv2.putText(img, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
+                        self.student_name_display.configure(text=f'Now Showing : {name}')
                 img = Image.fromarray(img)
                 imgtk = ImageTk.PhotoImage(image=img)
                 ctk_image = ctk.CTkImage(light_image=img, size=(640, 480))
