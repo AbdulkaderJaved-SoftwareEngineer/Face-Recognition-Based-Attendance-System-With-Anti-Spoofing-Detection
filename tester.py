@@ -1,3 +1,4 @@
+import math
 import os
 import random
 import customtkinter as ctk
@@ -11,14 +12,33 @@ import numpy as np
 import tkinter as tk
 import pandas as pd
 import datetime
-
+from keras.api.preprocessing.image import img_to_array
+from keras.api.models import model_from_json
 from FaceDetectionModule import faceCascade, detect
+from ultralytics import YOLO
+import AttendanceSummarizer
+
 
 ctk.set_appearance_mode("Dark")  # System, Dark, or Light
 ctk.set_default_color_theme("dark-blue")  # Optional: can use other themes like 'green', 'dark-blue'
 
+json_file = open('antispoofing_models/finalyearproject_antispoofing_model_mobilenet.json','r')
+loaded_model_json = json_file.read()
+json_file.close()
+
+model = model_from_json(loaded_model_json)
+# load antispoofing model weights
+model.load_weights('antispoofing_models/finalyearproject_antispoofing_model_66-1.000000.weights.h5')
+print("Anti Spoofing Model loaded")
+
+
+
+
+
+
 
 class StudentManagementApp:
+    
     def __init__(self, root):
 
         ctk.set_appearance_mode("Dark")  # System, Dark, or Light
@@ -62,6 +82,7 @@ class StudentManagementApp:
             messagebox.showerror("Error", "Failed to capture image")
 
         # Function to show the form and camera feed
+
 
     def show_capture_page(self):
         # Clear existing widgets
@@ -183,6 +204,25 @@ class AttendanceSystem:
         self.root.geometry("1000x600")
         self.isCameraStarted = False
         self.encodelistknown = []
+        json_file = open('antispoofing_models/finalyearproject_antispoofing_model_mobilenet.json', 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+        self.model = model_from_json(loaded_model_json)
+        # load antispoofing model weights
+        self.model.load_weights('antispoofing_models/finalyearproject_antispoofing_model_66-1.000000.weights.h5')
+        print("Model loaded from disk")
+
+        """self.classNames = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat",
+              "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat",
+              "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella",
+              "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat",
+              "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup",
+              "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli",
+              "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed",
+              "diningtable", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone",
+              "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors",
+              "teddy bear", "hair drier", "toothbrush"]
+"""
 
         self.cap = None  # Capture object for the webcam
         self.video_running = False
@@ -216,7 +256,7 @@ class AttendanceSystem:
         btn_view_people = ctk.CTkButton(left_frame, text="View People", command=self.view_people)
         btn_view_people.pack(pady=10)
 
-        btn_view_graph = ctk.CTkButton(left_frame, text="Graphs", command=self.view_graph)
+        btn_view_graph = ctk.CTkButton(left_frame, text="Graphs", command=self.attendance_summarizer)
         btn_view_graph.pack(pady=10)
 
         # Right side frame
@@ -278,8 +318,6 @@ class AttendanceSystem:
             return encodelist
 
 
-
-
         self.encodelistknown = findencodings(images)
 
         print("Encoding Completed!!!")
@@ -289,23 +327,100 @@ class AttendanceSystem:
             self.status_label.configure(text="Video feed running")
             self.open_camera()
 
+    def is_spoof(self,frame):
+
+        resized_face = cv2.resize(frame, (160, 160))
+        resized_face = resized_face.astype("float") / 255.0
+        # resized_face = img_to_array(resized_face)
+        resized_face = np.expand_dims(resized_face, axis=0)
+        # pass the face ROI through the trained liveness detector
+        # model to determine if the face is "real" or "fake"
+        preds = model.predict(resized_face)[0]
+        print(preds)
+        if preds > 0.6:
+            label = 'spoof'
+            print(f"Showing Spoof Image {preds}")
+            messagebox.showwarning("Spoof Face Detected", "You are trying to Spoof the system")
+
+
+
+    def checkPhone(self, img):
+        results = self.phone(img, stream=True)
+        org = False
+        # coordinates
+        for r in results:
+            boxes = r.boxes
+
+            for box in boxes:
+                # bounding box
+                x1, y1, x2, y2 = box.xyxy[0]
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)  # convert to int values
+                cls = int(box.cls[0])
+                print("Class name -->", self.classNames[cls])
+                if self.classNames[cls] == "cell phone":
+                    # put box in cam
+                    cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 3)
+                    print(self.classNames[cls])
+                    # confidence
+                    confidence = math.ceil((box.conf[0] * 100)) / 100
+                    print("Confidence --->", confidence)
+
+                    # class name
+
+                    # object details
+                    org = [x1, y1]
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    fontScale = 1
+                    color = (255, 0, 0)
+                    thickness = 2
+
+                    org = True
+        return org
+    def show_main_page(self):
+        # Release the camera if it's open
+        if self.cap is not None:
+            self.cap.release()
+            self.cap = None
+
+        # Clear existing widgets
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        backgrodundImage = Image.open('logo.png')
+        bgImage2 = ImageTk.PhotoImage(backgrodundImage,size=(20,20))
+        label = ctk.CTkLabel(self.root,image=bgImage2,text="")
+        label.pack()
+
+
+        # Add Student button
+        add_student_button = ctk.CTkButton(self.root, text="Add Student", command=self.show_capture_page,width= 150,
+             height = 40)
+        add_student_button.pack(expand=True)
+
+    def go_to_back_page(self):
+        if self.cap is not None:
+            self.cap.release()
+            self.cap = None
+
+        self.show_main_page()
+    def show_page(self):
+        self.Attendance_Summarizer(self.window)  # Use correct function name
+
+        back_button = ctk.CTkButton(self.window, text="Back", command=self.window.destroy)
+        back_button.pack(pady=10)
+
+    def attendance_summarizer(self):
+        AttendanceSummarizer.AttendanceSummarizerPage(self.root, self.go_to_back_page)
+
     def view_people(self):
         messagebox.showinfo("View People", "This feature will list all people.")
 
-    def view_graph(self):
-        # Dummy data for graph
-        attendance = [20, 35, 30, 35, 27]
-        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-
-        plt.bar(days, attendance)
-        plt.xlabel('Days')
-        plt.ylabel('Attendance')
-        plt.title('Weekly Attendance')
-        plt.show()
 
     def open_camera(self):
         if self.video_running:
             ret, img = self.cap.read()
+
+
             if ret:
                 frame = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -315,46 +430,53 @@ class AttendanceSystem:
                 encodeCur = face_recognition.face_encodings(imgS, faceCur)
 
                 for encodeFace, faceloc in zip(encodeCur, faceCur):
+                    # Get face coordinates
+                    y1, x2, y2, x1 = faceloc
+                    y1, x2, y2, x1 = y1 * 4, x2 * 4,  y2 * 4, x1 * 4
+                    face_img = img[y1:y2, x1:x2]
+
+
+                    # Perform anti-spoofing check
+
+                    if self.is_spoof(frame=frame) == "Spoof":  # Spoof detected
+                        label = 'Spoof'
+                        print("Showing Spoof Image")
+                        self.student_name_display.configure(text="Spoof Detected!", font=('Arial', 25))
+
+                        # Draw bounding box and label for the spoofed face
+                        cv2.putText(img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
+                    # Perform face recognition if the face is not a spoof
                     matches = face_recognition.compare_faces(self.encodelistknown, encodeFace)
                     faceDis = face_recognition.face_distance(self.encodelistknown, encodeFace)
                     matchIndex = np.argmin(faceDis)
 
                     if matches[matchIndex]:
                         name = self.className[matchIndex].upper()
-                        y1, x2, y2, x1 = faceloc
-                        y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
                         cv2.rectangle(img, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
                         cv2.putText(img, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
-                        self.student_name_display.configure(text=f'Now Showing : {name}',font=('Arial', 25))
+                        self.student_name_display.configure(text=f'Now Showing: {name}', font=('Arial', 25))
 
-                        with open('Attendance.csv', 'r+') as f:
-                            mydataList = f.readlines()  # Use readlines() instead of readline()
-                            namelist = []
-
-                            for line in mydataList:
-                                entry = line.split(',')
-                                namelist.append(entry[0])
+                        with open('Attendance.csv', 'a+') as f:
+                            mydataList = f.readlines()
+                            namelist = [line.split(',')[0] for line in mydataList]
 
                             if name not in namelist:
                                 now1 = datetime.datetime.now()
                                 dateString = now1.strftime('%I:%M:%S')
                                 taarik = now1.strftime('%Y/%m/%d')
                                 f.writelines(f'\n{name},{dateString},Present,{taarik}')
-                                f.flush()  # Ensure the data is written before reading the file
-
-                                # Specify the engine explicitly
-                                  # Use 'openpyxl' for .xlsx files
-
+                                f.flush()
 
                     else:
                         name = "UNKNOWN"
-                        y1, x2, y2, x1 = faceloc
-                        y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
                         cv2.rectangle(img, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
                         cv2.putText(img, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
-                        self.student_name_display.configure(text=f'Now Showing : {name}')
+                        self.student_name_display.configure(text=f'Now Showing: {name}')
+
                 img = Image.fromarray(img)
                 imgtk = ImageTk.PhotoImage(image=img)
                 ctk_image = ctk.CTkImage(light_image=img, size=(640, 480))
